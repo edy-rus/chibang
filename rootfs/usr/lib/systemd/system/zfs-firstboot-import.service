@@ -1,10 +1,16 @@
 # Import existing pools once and seed /etc/zfs/zpool.cache. After that the
 # stock zfs-import-cache.service imports them and this unit skips itself.
+# Early-boot unit: DefaultDependencies=no and the same ordering as the stock
+# zfs-import-cache.service, otherwise it lands after basic.target and creates
+# an ordering cycle through zfs-mount -> local-fs.target -> sysinit.target.
 [Unit]
 Description=First-boot import of existing ZFS pools (seeds zpool.cache)
+DefaultDependencies=no
 ConditionPathExists=!/etc/zfs/zpool.cache
-After=systemd-udev-settle.service zfs-import-cache.service
-Before=zfs-mount.service zfs-import.target
+Wants=systemd-udev-settle.service
+After=systemd-udev-settle.service systemd-udev-trigger.service systemd-modules-load.service
+After=cryptsetup.target multipathd.service systemd-remount-fs.service zfs-import-cache.service
+Before=zfs-import.target
 
 [Service]
 Type=oneshot
@@ -12,4 +18,4 @@ RemainAfterExit=yes
 ExecStart=/usr/sbin/zpool import -a -N -d /dev/disk/by-id -o cachefile=/etc/zfs/zpool.cache
 
 [Install]
-WantedBy=zfs-import.target multi-user.target
+WantedBy=zfs-import.target

@@ -25,4 +25,8 @@ RUN test -n "$IMAGE_REF"; \
 RUN systemctl enable tailscaled.service tailscale-init.service \
       zfs-firstboot-import.service chibang-zfs-load-key.service restic-offsite.timer
 
+# Fail the build on systemd ordering cycles (systemd "fixes" them at boot by
+# dropping random jobs, which can leave the host half-booted and unreachable).
+RUN ! systemd-analyze verify default.target 2>&1 | grep -i 'ordering cycle'
+
 RUN bootc container lint
