@@ -1,0 +1,16 @@
+# uCore's stock zfs-load-key.service is an empty stub, so this loads the keys.
+# hdd_pool/enc uses keylocation=file:///etc/zfs/hdd_pool_enc.key, which is
+# restored from pass (restore-secrets.sh), never baked into the image.
+[Unit]
+Description=Load ZFS encryption keys
+DefaultDependencies=no
+After=zfs-import.target
+Before=zfs-mount.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/zfs load-key -a
+
+[Install]
+WantedBy=zfs-mount.service

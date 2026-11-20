@@ -1,0 +1,4 @@
+# Extra packages baked into the image (Fedora repos), one per line.
+# Anything here is available on the host without toolbox/distrobox.
+btop
+lftp    # parallel/segmented pulls from the US box (Caddy on its tailnet IP) over ~185 ms RTT

@@ -1,0 +1,15 @@
+# Log in only if tailscaled isn't logged in yet. The auth key lives on the
+# pool; without it this unit skips and you run `tailscale up` by hand.
+[Unit]
+Description=First-boot Tailscale login (no-op once the node is logged in)
+After=network-online.target zfs-mount.service tailscaled.service
+Wants=network-online.target tailscaled.service
+ConditionPathExists=/var/hdd_pool/secrets/tailscale.auth
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c '/usr/bin/tailscale status >/dev/null 2>&1 || /usr/bin/tailscale up --auth-key=file:/var/hdd_pool/secrets/tailscale.auth --advertise-exit-node'
+
+[Install]
+WantedBy=multi-user.target

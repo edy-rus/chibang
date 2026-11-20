@@ -1,0 +1,44 @@
+name: build image
+on:
+  push:
+    branches: [main]
+    paths: [Containerfile, packages.txt, 'rootfs/**', .github/workflows/build.yml]
+  schedule:
+    - cron: '30 4 * * *'   # daily: picks up the latest upstream ucore-hci:stable
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image name
+        run: |
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/chibang" >> "$GITHUB_ENV"
+          echo "DATE=$(date -u +%Y%m%d)" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: |
+          podman build --pull=always --build-arg IMAGE_REF="$IMAGE" \
+            -t "$IMAGE:stable" -t "$IMAGE:stable-$DATE" .
+
+      - name: Push
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+          podman push --digestfile digest "$IMAGE:stable"
+          podman push "$IMAGE:stable-$DATE"
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Sign
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
+          COSIGN_PASSWORD: ""
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | cosign login ghcr.io -u "${{ github.actor }}" --password-stdin
+          cosign sign -y --key env://COSIGN_PRIVATE_KEY "$IMAGE@$(cat digest)"

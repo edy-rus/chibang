@@ -1,0 +1,12 @@
+[Unit]
+Description=Mirror restic repo to MEGA S4
+Wants=network-online.target
+After=network-online.target
+RequiresMountsFor=/var/hdd_pool/transfer
+
+[Service]
+Type=oneshot
+User=core
+ExecStart=/usr/libexec/chibang/restic-offsite.sh
+Nice=10
+IOSchedulingClass=idle
