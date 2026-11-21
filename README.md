@@ -29,7 +29,7 @@ What the image sets up:
 - **Backups**: `restic-offsite.timer` mirrors `/var/hdd_pool/transfer/restic` to
   MEGA S4 every night at 00:00 UTC.
 - **Tailscale**: exit node, logs itself in from the auth key on the pool.
-- **Firewall**: ssh and cockpit on the LAN, everything on `tailscale0`.
+- **Firewall**: only ssh (and DHCPv6) on the LAN, everything on `tailscale0`.
 
 ## Making changes
 
