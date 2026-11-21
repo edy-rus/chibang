@@ -1,0 +1,24 @@
+name: validate ignition
+on:
+  push:
+    paths: ['ignition/**', .github/workflows/validate-ignition.yml]
+  pull_request:
+    paths: ['ignition/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  butane:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      # Ignition transpiles Butane at boot without strict checks, so catch
+      # typos and warnings here instead of on a half-provisioned host.
+      - name: butane --strict
+        run: |
+          for bu in ignition/*.bu; do
+            echo "checking $bu"
+            docker run --rm -i quay.io/coreos/butane:release --strict < "$bu" > /dev/null
+          done

@@ -16,10 +16,10 @@ Containerfile        image = ucore-hci:stable + packages.txt + rootfs/
 packages.txt         extra host packages (btop, lftp, ...)
 rootfs/              files copied onto / : systemd units, firewalld zones,
                      sysctl, scripts, image-signing public key
-ignition/chibang.bu  first-boot config: SSH key, hostname, rebase to the image
-build-ign.sh         renders ignition/*.bu -> *.ign (no secrets, committed)
+ignition/chibang.bu  first-boot config (Butane): SSH key, hostname, rebase to the image
 restore-secrets.sh   puts the secrets from pass onto the host after install
-.github/workflows/   builds, pushes and signs ghcr.io/edy-rus/chibang
+.github/workflows/   build.yml: builds, pushes and signs ghcr.io/edy-rus/chibang
+                     validate-ignition.yml: butane --strict on ignition/*.bu
 ```
 
 What the image sets up:
@@ -46,14 +46,20 @@ in `rootfs/` or the Containerfile.
 
 ```
 sudo coreos-installer install /dev/sdX \
-  --ignition-url https://raw.githubusercontent.com/edy-rus/chibang/main/ignition/chibang.ign
+  --ignition-url https://raw.githubusercontent.com/edy-rus/chibang/main/ignition/chibang.bu
 ```
+
+Fedora CoreOS 45+ Ignition reads the Butane file directly, so there is no
+transpile step; CI checks every change with `butane --strict` instead. (If an
+installer ever refuses a non-JSON config, render it once with
+`docker run --rm -i quay.io/coreos/butane:release --strict < ignition/chibang.bu > chibang.ign`
+and pass `--ignition-file chibang.ign`.)
 
 First boot rebases to the image unverified, reboots, switches to the signed
 image and reboots again. That takes a few minutes and needs no input.
 
 For a test VM, copy `ignition/chibang.bu` to e.g. `chibang-test.bu`, change the
-hostname, run `./build-ign.sh`, push and use that URL. Otherwise it shows up
+hostname, push and use that URL. Otherwise it shows up
 as a second "chibang" on the LAN and tailnet.
 
 ## After install: load the secrets
