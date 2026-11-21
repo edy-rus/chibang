@@ -65,8 +65,13 @@ as a second "chibang" on the LAN and tailnet.
 
 ## After install: load the secrets
 
-Secrets are never in the image or in git. Once the host is up on the signed
-image (`rpm-ostree status` shows `ostree-image-signed:...`), run from the laptop:
+Secrets are never in the image, in git or on the install media; the only key
+Ignition installs is the SSH *public* key. Until this step `hdd_pool/enc` stays
+locked (`chibang-zfs-load-key` shows as failed) and the offsite mirror can't run.
+
+Once the host is up on the signed image (`rpm-ostree status` shows
+`ostree-image-signed:...`), run from the laptop. After a reinstall, clear the
+old host key first with `ssh-keygen -R chibang-1`.
 
 ```
 ./restore-secrets.sh            # default target core@chibang-1
@@ -79,7 +84,7 @@ This copies from pass:
 | `zfs/hdd_pool_enc.key`        | `/etc/zfs/hdd_pool_enc.key` (unlocks `hdd_pool/enc`) |
 | `homelab/chibang/rclone.conf` | `~core/.config/rclone/rclone.conf` (offsite mirror) |
 
-It then unlocks and mounts `hdd_pool/enc` right away. Afterwards, check:
+It then re-runs `chibang-zfs-load-key` and mounts `hdd_pool/enc` right away. Afterwards, check:
 
 ```
 systemctl --failed

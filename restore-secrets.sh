@@ -9,5 +9,5 @@ pass show zfs/hdd_pool_enc.key \
 pass show homelab/chibang/rclone.conf \
   | ssh "$host" 'install -D -m 0600 /dev/stdin ~/.config/rclone/rclone.conf'
 
-# Unlock and mount enc now instead of waiting for the next boot.
-ssh "$host" 'sudo zfs load-key hdd_pool/enc 2>/dev/null || true; sudo zfs mount -a; zfs get -H keystatus hdd_pool/enc'
+# Re-run the key unit (it failed at boot without the key), then mount enc.
+ssh "$host" 'sudo systemctl restart chibang-zfs-load-key.service && sudo zfs mount -a && zfs get -H keystatus hdd_pool/enc'
