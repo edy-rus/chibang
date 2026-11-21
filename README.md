@@ -49,11 +49,12 @@ sudo coreos-installer install /dev/sdX \
   --ignition-url https://raw.githubusercontent.com/edy-rus/chibang/main/ignition/chibang.bu
 ```
 
-Fedora CoreOS 45+ Ignition reads the Butane file directly, so there is no
-transpile step; CI checks every change with `butane --strict` instead. (If an
-installer ever refuses a non-JSON config, render it once with
+`--ignition-url`/`--ignition-file` take either Butane YAML or Ignition JSON
+(coreos-installer 0.27.0+, Fedora CoreOS 45+ Ignition), so there is no transpile
+step; CI checks every change with `butane --strict` instead. An older installer
+(e.g. an old live ISO) fails with "not a valid Ignition JSON config": render it once with
 `docker run --rm -i quay.io/coreos/butane:release --strict < ignition/chibang.bu > chibang.ign`
-and pass `--ignition-file chibang.ign`.)
+and pass `--ignition-file chibang.ign`.
 
 First boot rebases to the image unverified, reboots, switches to the signed
 image and reboots again. That takes a few minutes and needs no input.
