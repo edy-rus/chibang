@@ -3,7 +3,7 @@
 # No secrets in here, so it is safe to publish. Fedora CoreOS 45+ Ignition reads
 # Butane YAML directly; CI (validate-ignition.yml) checks it with butane --strict.
 variant: fcos
-version: 1.6.0
+version: 1.7.0
 passwd:
   users:
     - name: core
