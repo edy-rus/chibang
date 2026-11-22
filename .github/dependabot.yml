@@ -1,0 +1,18 @@
+# Weekly PRs bumping the SHA-pinned actions in .github/workflows (SHA and
+# version comment together). The Containerfile FROM is deliberately not
+# tracked: it follows ucore-hci:stable and the daily build picks that up.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    ignore:
+      # cosign-installer v4 installs cosign 3, whose default signature format
+      # may not verify on chibang (containers/image sigstore attachments).
+      # Remove once that upgrade is tested; minor/patch v3 bumps still come.
+      - dependency-name: sigstore/cosign-installer
+        update-types: ["version-update:semver-major"]

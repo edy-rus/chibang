@@ -20,7 +20,7 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Version = <Fedora major>.<build date>.<n>, e.g. 45.20261122.0, where n
       # counts builds that day. The upstream version and digest go in the
