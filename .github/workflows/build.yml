@@ -20,10 +20,7 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Log in to ghcr.io
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # Version = <Fedora major>.<build date>.<n>, e.g. 45.20261122.0, where n
       # counts builds that day. The upstream version and digest go in the
@@ -66,19 +63,23 @@ jobs:
       # stable-DATE     moving: last build of that day
       # VERSION         immutable: pin/rollback target
       - name: Push
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          echo "$REGISTRY_TOKEN" | podman login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           podman push --digestfile digest "$IMAGE:stable"
           for tag in "$MAJOR" "stable-$DATE" "$VERSION"; do
             podman push "$IMAGE:stable" "$IMAGE:$tag"
           done
 
-      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3.9.1
 
       - name: Sign
         env:
           COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
           COSIGN_PASSWORD: ""
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | cosign login ghcr.io -u "${{ github.actor }}" --password-stdin
+          echo "$REGISTRY_TOKEN" | cosign login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           # One signature on the digest covers every tag above.
           cosign sign -y --key env://COSIGN_PRIVATE_KEY "$IMAGE@$(cat digest)"
