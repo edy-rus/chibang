@@ -1,0 +1,8 @@
+// Let the core user manage system libvirt without a password prompt, so
+// OpenTofu (qemu+sshcmd) and virsh over SSH work non-interactively.
+// core is in wheel, which only gets auth_admin (sudo password) by default.
+polkit.addRule(function (action, subject) {
+  if (action.id == "org.libvirt.unix.manage" && subject.user == "core") {
+    return polkit.Result.YES;
+  }
+});
