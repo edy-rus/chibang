@@ -1,0 +1,19 @@
+# Host bridge for libvirt VMs (Talos). DHCP: the router's reservation is the
+# source of truth for the IP. br0 inherits the NIC's MAC (see
+# /usr/lib/systemd/network/50-br0.link), so the reservation keeps matching and
+# nothing here is host-specific.
+[connection]
+id=br0
+type=bridge
+interface-name=br0
+zone=FedoraServer
+
+[bridge]
+# One uplink, no loops: skip STP's 15-30 s forwarding delay at boot.
+stp=false
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto

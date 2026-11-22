@@ -1,0 +1,13 @@
+# Enslaves whatever wired NIC the machine has to br0. No interface-name or MAC,
+# so it matches any physical ethernet (predictable names all start with "en").
+# Because it matches, NM never generates "Wired connection 1"; the priority
+# makes it beat any leftover wired profile in /etc.
+[connection]
+id=br0-port
+type=ethernet
+controller=br0
+port-type=bridge
+autoconnect-priority=10
+
+[match]
+interface-name=en*;

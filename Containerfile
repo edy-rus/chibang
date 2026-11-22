@@ -13,6 +13,8 @@ RUN pkgs=$(sed 's/#.*//' /tmp/packages.txt | xargs); \
 
 # Host config: systemd units, firewalld zones, sysctl, scripts, signing pubkey.
 COPY rootfs/ /
+# NetworkManager ignores keyfiles that aren't root-owned 0600; git can't store that.
+RUN chmod 600 /usr/lib/NetworkManager/system-connections/*.nmconnection
 
 # Trust our own signature for ghcr.io/<owner>/chibang, so `rpm-ostree upgrade`
 # and the ostree-image-signed rebase verify every update.

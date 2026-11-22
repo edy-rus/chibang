@@ -1,0 +1,9 @@
+# systemd's default policy (99-default.link: MACAddressPolicy=persistent) gives
+# bridges a MAC derived from the machine-id, which changes on every reinstall
+# and doesn't match the router's DHCP reservation. With no policy, the kernel
+# gives br0 the MAC of its port, i.e. the physical NIC.
+[Match]
+OriginalName=br0
+
+[Link]
+MACAddressPolicy=none
