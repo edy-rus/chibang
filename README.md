@@ -1,7 +1,8 @@
 # chibang
 
-chibang is my main home server: ZFS storage for my data, the household restic
-backup target (mirrored nightly offsite), and the host for my apps and VMs.
+chibang is a home server: ZFS storage, a restic backup target (mirrored nightly
+offsite), and the libvirt host for the Talos Kubernetes VMs defined in
+[k8s-infra](https://github.com/edy-rus/k8s-infra).
 
 It runs a custom, signed [bootc](https://containers.github.io/bootc/) image built
 on [uCore HCI](https://projectucore.org) (Fedora CoreOS with ZFS, KVM/libvirt and
@@ -15,7 +16,8 @@ from one Ignition URL.
 Containerfile        image = ucore-hci:stable + packages.txt + rootfs/
 packages.txt         extra host packages (btop, lftp, ...)
 rootfs/              files copied onto / : systemd units, firewalld zones,
-                     sysctl, scripts, image-signing public key
+                     NetworkManager profiles, polkit rule, sysctl, scripts,
+                     image-signing public key
 ignition/chibang.bu  first-boot config (Butane): SSH key, hostname, rebase to the image
 restore-secrets.sh   puts the secrets from pass onto the host after install
 .github/workflows/   build.yml: builds, pushes and signs ghcr.io/edy-rus/chibang
@@ -28,6 +30,11 @@ What the image sets up:
   mounts `hdd_pool` on every boot.
 - **Backups**: `restic-offsite.timer` mirrors `/var/hdd_pool/transfer/restic` to
   MEGA S4 every night at 00:00 UTC.
+- **Network**: bridge `br0` (DHCP) over whatever wired NIC the machine has, so
+  VMs sit directly on the LAN. `br0` takes the NIC's MAC, so the router's DHCP
+  reservation keeps matching. Nothing in the image names a NIC, MAC or IP.
+- **libvirt**: KVM via uCore HCI; a polkit rule lets `core` manage system
+  libvirt over SSH without a password prompt (used by OpenTofu).
 - **Tailscale**: exit node, logs itself in from the auth key on the pool.
 - **Firewall**: only ssh (and DHCPv6) on the LAN, everything on `tailscale0`.
 
