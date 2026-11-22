@@ -39,6 +39,28 @@ automatically and switches to it on its next reboot (`rpm-ostree status` shows
 what is staged). The build fails on systemd ordering cycles and `bootc container
 lint` errors, so a broken image never reaches the host.
 
+### Versions and tags
+
+Each build is versioned `<Fedora major>.<YYYYMMDD>.<n>`, e.g. `45.20261122.0`
+(`n` counts builds that day). That is what `rpm-ostree status` shows. The ucore
+build it sits on is recorded in the `org.opencontainers.image.base.name` and
+`base.digest` labels.
+
+| Tag | Moves? | Use |
+|---|---|---|
+| `stable` | yes | what chibang tracks |
+| `45` | yes | latest build on Fedora 45 |
+| `stable-20261122` | yes, within the day | last build of that day |
+| `45.20261122.0` | no | pin or roll back to an exact build |
+
+To go back further than the one rollback deployment:
+
+```
+sudo rpm-ostree rebase ostree-image-signed:docker://ghcr.io/edy-rus/chibang:45.20261122.0
+# later, back to tracking:
+sudo rpm-ostree rebase ostree-image-signed:docker://ghcr.io/edy-rus/chibang:stable
+```
+
 Ignition only runs on the very first boot, so don't put config there. It belongs
 in `rootfs/` or the Containerfile.
 

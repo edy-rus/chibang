@@ -11,27 +11,65 @@ permissions:
   contents: read
   packages: write
 
+# Serialise builds so two runs on the same day can't pick the same version.
+concurrency:
+  group: build-image
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set image name
+      - name: Log in to ghcr.io
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      # Version = <Fedora major>.<build date>.<n>, e.g. 45.20261122.0, where n
+      # counts builds that day. The upstream version and digest go in the
+      # org.opencontainers.image.base.* labels instead of the version string.
+      - name: Compute version
         run: |
-          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/chibang" >> "$GITHUB_ENV"
-          echo "DATE=$(date -u +%Y%m%d)" >> "$GITHUB_ENV"
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/chibang"
+          BASE=ghcr.io/ublue-os/ucore-hci:stable
+          podman pull "$BASE"
+          BASE_DIGEST=$(podman image inspect "$BASE" --format '{{.Digest}}')
+          UPSTREAM_VERSION=$(podman image inspect "$BASE" --format '{{ index .Labels "org.opencontainers.image.version" }}')
+          MAJOR=${UPSTREAM_VERSION%%.*}
+          DATE=$(date -u +%Y%m%d)
+          n=$( (skopeo list-tags "docker://$IMAGE" 2>/dev/null || echo '{"Tags":[]}') \
+               | jq --arg p "$MAJOR.$DATE." '[.Tags[] | select(startswith($p))] | length')
+          VERSION="$MAJOR.$DATE.$n"
+          echo "Building $VERSION on $UPSTREAM_VERSION ($BASE_DIGEST)"
+          {
+            echo "IMAGE=$IMAGE"; echo "BASE=$BASE"; echo "BASE_DIGEST=$BASE_DIGEST"
+            echo "MAJOR=$MAJOR"; echo "DATE=$DATE"; echo "VERSION=$VERSION"
+          } >> "$GITHUB_ENV"
 
       - name: Build
         run: |
-          podman build --pull=always --build-arg IMAGE_REF="$IMAGE" \
-            -t "$IMAGE:stable" -t "$IMAGE:stable-$DATE" .
+          podman build --build-arg IMAGE_REF="$IMAGE" \
+            --label org.opencontainers.image.version="$VERSION" \
+            --label org.opencontainers.image.created="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --label org.opencontainers.image.revision="$GITHUB_SHA" \
+            --label org.opencontainers.image.source="https://github.com/$GITHUB_REPOSITORY" \
+            --label org.opencontainers.image.title=chibang \
+            --label org.opencontainers.image.description="chibang homelab server: ucore-hci plus host config" \
+            --label org.opencontainers.image.url="https://github.com/$GITHUB_REPOSITORY" \
+            --label org.opencontainers.image.base.name="$BASE" \
+            --label org.opencontainers.image.base.digest="$BASE_DIGEST" \
+            -t "$IMAGE:stable" .
 
+      # stable          moving: what the host tracks
+      # MAJOR           moving: latest build on this Fedora major
+      # stable-DATE     moving: last build of that day
+      # VERSION         immutable: pin/rollback target
       - name: Push
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
           podman push --digestfile digest "$IMAGE:stable"
-          podman push "$IMAGE:stable-$DATE"
+          for tag in "$MAJOR" "stable-$DATE" "$VERSION"; do
+            podman push "$IMAGE:stable" "$IMAGE:$tag"
+          done
 
       - uses: sigstore/cosign-installer@v3
 
@@ -41,4 +79,5 @@ jobs:
           COSIGN_PASSWORD: ""
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | cosign login ghcr.io -u "${{ github.actor }}" --password-stdin
+          # One signature on the digest covers every tag above.
           cosign sign -y --key env://COSIGN_PRIVATE_KEY "$IMAGE@$(cat digest)"
