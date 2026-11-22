@@ -37,8 +37,9 @@ jobs:
           UPSTREAM_VERSION=$(podman image inspect "$BASE" --format '{{ index .Labels "org.opencontainers.image.version" }}')
           MAJOR=${UPSTREAM_VERSION%%.*}
           DATE=$(date -u +%Y%m%d)
-          n=$( (skopeo list-tags "docker://$IMAGE" 2>/dev/null || echo '{"Tags":[]}') \
-               | jq --arg p "$MAJOR.$DATE." '[.Tags[] | select(startswith($p))] | length')
+          # No fallback on failure: guessing n=0 would overwrite an immutable tag.
+          tags=$(skopeo list-tags "docker://$IMAGE")
+          n=$(jq --arg p "$MAJOR.$DATE." '[.Tags[] | select(startswith($p))] | length' <<<"$tags")
           VERSION="$MAJOR.$DATE.$n"
           echo "Building $VERSION on $UPSTREAM_VERSION ($BASE_DIGEST)"
           {
