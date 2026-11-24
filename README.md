@@ -1,57 +1,43 @@
 # chibang
 
-chibang is a home server: ZFS storage, a restic backup target (mirrored nightly
-offsite), and the libvirt host for the Talos Kubernetes VMs defined in
-[k8s-infra](https://github.com/edy-rus/k8s-infra).
+chibang is my home server. It provides ZFS storage, a restic backup target with a nightly offsite copy, and the libvirt host for the Talos Kubernetes VMs defined in [k8s-infra](https://github.com/edy-rus/k8s-infra).
 
-It runs a custom, signed [bootc](https://containers.github.io/bootc/) image built
-on [uCore HCI](https://projectucore.org) (Fedora CoreOS with ZFS, KVM/libvirt and
-Tailscale). The OS is immutable and everything that makes it *this* server lives
-in this repo, so a reinstall, a new disk or a test VM comes back to the same state
-from one Ignition URL.
+It runs a custom, signed [bootc](https://containers.github.io/bootc/) image built on [uCore HCI](https://projectucore.org), which is Fedora CoreOS with ZFS, KVM/libvirt and Tailscale. The OS is immutable, and everything that makes it *this* server lives in this repo. A reinstall, a new disk or a test VM comes back to the same state from one Ignition URL.
 
 ## Layout
 
 ```
 Containerfile        image = ucore-hci:stable + packages.txt + rootfs/
-packages.txt         extra host packages (btop, lftp, ...)
-rootfs/              files copied onto / : systemd units, firewalld zones,
+packages.txt         extra host packages
+rootfs/              files copied onto / : systemd units, firewall zones,
                      NetworkManager profiles, polkit rule, sysctl, scripts,
                      image-signing public key
 ignition/chibang.bu  first-boot config (Butane): SSH key, hostname, rebase to the image
-restore-secrets.sh   puts the secrets from pass onto the host after install
-.github/workflows/   build.yml: builds, pushes and signs ghcr.io/edy-rus/chibang
+restore-secrets.sh   puts the secrets back on the host after an install
+.github/workflows/   build.yml: builds, pushes and signs the image
                      validate-ignition.yml: butane --strict on ignition/*.bu
 ```
 
-What the image sets up:
+## What the Image Sets Up
 
-- **ZFS**: imports existing pools on first boot, then loads encryption keys and
-  mounts `hdd_pool` on every boot.
-- **Backups**: `restic-offsite.timer` mirrors `/var/hdd_pool/transfer/restic` to
-  MEGA S4 every night at 00:00 UTC.
-- **Network**: bridge `br0` (DHCP) over whatever wired NIC the machine has, so
-  VMs sit directly on the LAN. `br0` takes the NIC's MAC, so the router's DHCP
-  reservation keeps matching. Nothing in the image names a NIC, MAC or IP.
-- **libvirt**: KVM via uCore HCI; a polkit rule lets `core` manage system
-  libvirt over SSH without a password prompt (used by OpenTofu).
-- **Tailscale**: exit node, logs itself in from the auth key on the pool.
-- **Firewall**: only ssh (and DHCPv6) on the LAN, everything on `tailscale0`.
+- **ZFS:** imports existing pools on first boot, then unlocks and mounts the pool on every boot.
+- **Backups:** a systemd timer mirrors the restic repository offsite every night.
+- **Network:** a `br0` bridge over whatever wired NIC the machine has, so VMs sit directly on the LAN. The bridge takes the NIC's MAC address, so the router's DHCP reservation keeps matching. Nothing in the image names a NIC, MAC or IP address.
+- **libvirt:** KVM through uCore HCI. A polkit rule lets the admin user manage system libvirt over SSH, which OpenTofu uses.
+- **Tailscale:** joins the tailnet automatically on boot.
+- **Firewall:** only what the host needs is open on the LAN. Everything else is reachable over Tailscale only.
 
-## Making changes
+## Making Changes
 
-Edit the repo and push. CI builds a new image (on every change and daily, to pick
-up upstream uCore), signs it and pushes it to ghcr.io. chibang stages the update
-automatically and switches to it on its next reboot (`rpm-ostree status` shows
-what is staged). The build fails on systemd ordering cycles and `bootc container
-lint` errors, so a broken image never reaches the host.
+Edit the repo and push. CI builds a new image on every change and once a day, to pick up upstream uCore. It signs the image and pushes it to ghcr.io. chibang stages the update automatically and switches to it on the next reboot (`rpm-ostree status` shows what is staged).
 
-### Versions and tags
+The build fails on systemd ordering cycles and `bootc container lint` errors, so a broken image never reaches the host.
 
-Each build is versioned `<Fedora major>.<YYYYMMDD>.<n>`, e.g. `45.20261122.0`
-(`n` counts builds that day). That is what `rpm-ostree status` shows. The ucore
-build it sits on is recorded in the `org.opencontainers.image.base.name` and
-`base.digest` labels.
+Ignition only runs on the very first boot, so do not put configuration there. It belongs in `rootfs/` or the Containerfile.
+
+### Versions and Tags
+
+Each build is versioned `<Fedora major>.<YYYYMMDD>.<n>`, for example `45.20261122.0`, where `n` counts the builds that day. That is what `rpm-ostree status` shows. The uCore build it sits on is recorded in the `org.opencontainers.image.base.name` and `base.digest` labels.
 
 | Tag | Moves? | Use |
 |---|---|---|
@@ -68,66 +54,46 @@ sudo rpm-ostree rebase ostree-image-signed:docker://ghcr.io/edy-rus/chibang:45.2
 sudo rpm-ostree rebase ostree-image-signed:docker://ghcr.io/edy-rus/chibang:stable
 ```
 
-Ignition only runs on the very first boot, so don't put config there. It belongs
-in `rootfs/` or the Containerfile.
+## Installing
 
-## Installing (bare metal or VM)
+The same steps work on bare metal or in a VM:
 
 ```
 sudo coreos-installer install /dev/sdX \
   --ignition-url https://raw.githubusercontent.com/edy-rus/chibang/main/ignition/chibang.bu
 ```
 
-`--ignition-url`/`--ignition-file` take either Butane YAML or Ignition JSON
-(coreos-installer 0.27.0+, Fedora CoreOS 45+ Ignition), so there is no transpile
-step; CI checks every change with `butane --strict` instead. An older installer
-(e.g. an old live ISO) fails with "not a valid Ignition JSON config": render it once with
-`docker run --rm -i quay.io/coreos/butane:release --strict < ignition/chibang.bu > chibang.ign`
-and pass `--ignition-file chibang.ign`.
-
-First boot rebases to the image unverified, reboots, switches to the signed
-image and reboots again. That takes a few minutes and needs no input.
-
-For a test VM, copy `ignition/chibang.bu` to e.g. `chibang-test.bu`, change the
-hostname, push and use that URL. Otherwise it shows up
-as a second "chibang" on the LAN and tailnet.
-
-## After install: load the secrets
-
-Secrets are never in the image, in git or on the install media; the only key
-Ignition installs is the SSH *public* key. Until this step `hdd_pool/enc` stays
-locked (`chibang-zfs-load-key` shows as failed) and the offsite mirror can't run.
-
-Once the host is up on the signed image (`rpm-ostree status` shows
-`ostree-image-signed:...`), run from the laptop. After a reinstall, clear the
-old host key first with `ssh-keygen -R chibang-1`.
+coreos-installer 0.27.0 and later accept Butane YAML directly, so there is no transpile step. CI checks every change with `butane --strict` instead. An older installer fails with "not a valid Ignition JSON config". In that case, render the config once and pass the file:
 
 ```
-./restore-secrets.sh            # default target core@chibang-1
+docker run --rm -i quay.io/coreos/butane:release --strict < ignition/chibang.bu > chibang.ign
+sudo coreos-installer install /dev/sdX --ignition-file chibang.ign
 ```
 
-This copies from pass:
+On first boot the machine rebases to the image unverified, reboots, switches to the signed image and reboots again. This takes a few minutes and needs no input.
 
-| pass entry                    | goes to                                   |
-|-------------------------------|-------------------------------------------|
-| `zfs/hdd_pool_enc.key`        | `/etc/zfs/hdd_pool_enc.key` (unlocks `hdd_pool/enc`) |
-| `homelab/chibang/rclone.conf` | `~core/.config/rclone/rclone.conf` (offsite mirror) |
+For a test VM, copy `ignition/chibang.bu` to a new file, change the hostname, push it and install from that URL. Otherwise the VM shows up as a second chibang on the LAN and the tailnet.
 
-It then re-runs `chibang-zfs-load-key` and mounts `hdd_pool/enc` right away. Afterwards, check:
+## Restoring Secrets
+
+Secrets are never in the image, in git or on the install media. The only key Ignition installs is the SSH *public* key. Until the secrets are restored, the encrypted dataset stays locked and the offsite mirror cannot run.
+
+Once the host is up on the signed image (`rpm-ostree status` shows `ostree-image-signed:...`), run this from the admin machine:
+
+```
+./restore-secrets.sh
+```
+
+It copies the secrets from my password store onto the host, unlocks the encrypted dataset and mounts it. After a reinstall, clear the old host key first with `ssh-keygen -R <host>`.
+
+Then check:
 
 ```
 systemctl --failed
-zfs get -H keystatus hdd_pool/enc        # available
+zfs get -H keystatus
 systemctl list-timers restic-offsite.timer
 ```
 
-The Tailscale auth key stays on the pool (`/var/hdd_pool/secrets/tailscale.auth`),
-so it doesn't need restoring.
+## Image Signing
 
-## Signing (one-time, already done)
-
-Images are signed with cosign. The private key is in pass as
-`homelab/chibang/cosign.key` and in the repo secret `SIGNING_SECRET`. The public
-key is `rootfs/etc/pki/containers/chibang.pub`, and the image's
-`/etc/containers/policy.json` trusts it for `ghcr.io/edy-rus/chibang`, so every
-update is verified before it is staged.
+Images are signed with cosign. The private key is in my password store and in a repository secret used by CI. The public key ships in the image under `rootfs/etc/pki/containers/`, and the image's `/etc/containers/policy.json` trusts it for `ghcr.io/edy-rus/chibang`. Every update is verified before it is staged.
