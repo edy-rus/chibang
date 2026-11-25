@@ -9,7 +9,7 @@ The one idea to hold on to: **the OS is an artefact, not a place you work in.** 
 For the story of why it is built this way, see the write-up [Chibang - A GitOps-Managed Home Server for Kubernetes](https://edy.tarbide.com/projects/gitops-managed-home-server/).
 
 ```mermaid
-flowchart LR
+flowchart TB
     laptop["<b>Laptop</b><br/>edits the repo,<br/>holds the secrets"]
     repo["<b>This repo</b><br/>Containerfile,<br/>packages, rootfs/"]
     ci["<b>GitHub Actions</b><br/>build, version,<br/>push, sign digest"]
