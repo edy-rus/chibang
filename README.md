@@ -145,8 +145,11 @@ The timestamp `rpm-ostree status` prints beside the version is inherited from up
 
 The same steps work on bare metal or in a VM:
 
+> [!WARNING]
+> The install erases the target disk. Point it at the OS SSD by its `/dev/disk/by-id/` path, never at a pool member, since `/dev/sdX` names can change between boots. The ZFS pool on the HDDs is not touched.
+
 ```
-sudo coreos-installer install /dev/sdX \
+sudo coreos-installer install /dev/disk/by-id/<os-ssd> \
   --ignition-url https://raw.githubusercontent.com/edy-rus/chibang/main/ignition/chibang.bu
 ```
 
@@ -154,7 +157,7 @@ coreos-installer 0.27.0 and later accept Butane YAML directly. An older installe
 
 ```
 docker run --rm -i quay.io/coreos/butane:release --strict < ignition/chibang.bu > chibang.ign
-sudo coreos-installer install /dev/sdX --ignition-file chibang.ign
+sudo coreos-installer install /dev/disk/by-id/<os-ssd> --ignition-file chibang.ign
 ```
 
 Ignition runs once, on the first boot only, so configuration never goes there. It belongs in `rootfs/` or the Containerfile.
@@ -166,6 +169,20 @@ Stock Fedora CoreOS does not have the signing key, so it cannot verify the image
 1. **Stock Fedora CoreOS** rebases to the image unverified, leaves a marker in `/etc`, and reboots.
 2. **chibang, unverified.** Now the policy and public key are present, so it rebases to the signed image, leaves a second marker, and reboots.
 3. **chibang, signed.** Both markers exist, so neither step runs again. Every update from here on is verified.
+
+### When the Boots Stall
+
+Each step writes its marker only after its rebase succeeds. A failed rebase leaves the host up on the system it already has, with no reboot, and the step runs again on the next boot. Log in over SSH and see how far it got:
+
+```
+ls /etc/ucore-autorebase/      # no marker: step 1 failed, unverified only: step 2 failed
+rpm-ostree status              # what is booted and what is staged
+journalctl -b -u ucore-unsigned-autorebase -u ucore-signed-autorebase
+```
+
+The usual causes are no network at boot, the registry being unreachable, or, on step 2, a signature that does not verify against the key in the image. Once the cause is fixed, run the step by hand with `sudo systemctl start ucore-signed-autorebase` (or the unsigned one). It rebases and reboots exactly as it would have at boot.
+
+If a step did reboot but the new system will not come up or is unreachable on the network, pick the previous entry in the boot menu. That is the system the step started from, still intact. Read the failed boot's log with `journalctl -b -1` from there.
 
 For a test VM, copy `ignition/chibang.bu`, change the hostname, push it and install from that URL. Otherwise the VM shows up as a second chibang on the LAN and the tailnet.
 
