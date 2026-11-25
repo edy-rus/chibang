@@ -2,8 +2,9 @@
 # Copy the local restic repo offsite (MEGA S4), append only. Credentials are in
 # core's rclone.conf (restored from pass by restore-secrets.sh), not in the image.
 #
-# `copy`, not `sync`: nothing is ever deleted offsite, so a bad prune, deleted
-# files or ransomware on chibang cannot reach the offsite copy. restic writes
+# `copy`, not `sync`: this script never deletes offsite, and the bucket policy
+# denies deletes for this key, so a bad prune, deleted files or ransomware on
+# chibang (which holds the key) cannot reach the offsite copy. restic writes
 # every file once and never edits it, so `--immutable` turns a file whose size
 # or timestamp changed into a failed run instead of an overwrite. Existing
 # offsite objects are never replaced. Bit rot is ZFS's job: checksums make a
