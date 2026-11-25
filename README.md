@@ -74,7 +74,7 @@ Each step adds one thing to the image:
 | Area | Files | What they do |
 |---|---|---|
 | ZFS | `zfs-firstboot-import.service`, `chibang-zfs-load-key.service` | Import the existing pool once, then load encryption keys before mounting on every boot |
-| Backups | `restic-offsite.{service,timer}`, `restic-offsite.sh` | Mirror the restic repository offsite every night, after checking it is safe to |
+| Backups | `restic-offsite.{service,timer}`, `restic-offsite.sh` | Copy the restic repository offsite every night (append only), after checking it is safe to |
 | Network | `br0.nmconnection`, `br0-port.nmconnection`, `50-br0.link` | A `br0` bridge over whatever wired NIC exists, so VMs sit on the LAN |
 | libvirt | `50-libvirt-core.rules` | Lets the admin user manage libvirt over SSH without a password prompt |
 | Tailscale | `tailscale-init.service`, `99-tailscale.conf` | Joins the tailnet on first boot, turns on forwarding |
@@ -93,7 +93,7 @@ The pool already exists on the HDDs. The OS never creates it, it only imports an
 
 ### Backups
 
-Clients back up into a restic repository on the pool. A timer copies that repository offsite every night, and a missed run happens at the next boot. Before it copies, the script checks that the local repository exists, that no backup or prune holds a lock, and that the remote is the same repository. The copy is a mirror (deletions included), which is why those checks matter.
+Clients back up into a restic repository on the pool. A timer copies that repository offsite every night, and a missed run happens at the next boot. Before it copies, the script checks that the local repository exists, that no backup or prune holds a lock, and that the remote is the same repository. The copy is append only (`rclone copy --immutable`, lock files excluded). Nothing is ever deleted offsite, and a file that changed locally fails the run instead of being uploaded, so a bad prune or a compromised chibang cannot reach the offsite copy. The rclone key cannot delete either, because the bucket policy denies it. Prune frees no space offsite, so that is cleaned up deliberately from another machine.
 
 ### Network
 
