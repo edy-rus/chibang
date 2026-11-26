@@ -10,3 +10,5 @@ User=core
 ExecStart=/usr/libexec/chibang/restic-offsite.sh
 Nice=10
 IOSchedulingClass=idle
+# The script may wait up to 3 h for a running backup, then copies.
+TimeoutStartSec=6h
